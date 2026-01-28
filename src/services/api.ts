@@ -1,7 +1,7 @@
 import { api } from '@/lib/api';
-import { Warehouse, Product, Supplier, Category, ImportReceipt, ExportReceipt, Inventory, Partner } from '@/types';
+import { Warehouse, Product, Supplier, Category, ImportReceipt, ExportReceipt, Inventory, Partner, TransferReceipt, TransferStatus } from '@/types';
 
-// Warehouses API
+
 export const warehousesApi = {
   getAll: () => api.get<Warehouse[]>('/warehouses'),
   getActive: () => api.get<Warehouse[]>('/warehouses/active'),
@@ -11,7 +11,7 @@ export const warehousesApi = {
   delete: (id: string) => api.delete(`/warehouses/${id}`),
 };
 
-// Categories API
+
 export const categoriesApi = {
   getAll: () => api.get<Category[]>('/categories'),
   getTrees: () => api.get<Category[]>('/categories/trees'),
@@ -22,7 +22,7 @@ export const categoriesApi = {
   delete: (id: string) => api.delete(`/categories/${id}`),
 };
 
-// Products API
+
 export const productsApi = {
   getAll: (search?: string) => api.get<Product[]>('/products', { params: { search } }),
   getActive: () => api.get<Product[]>('/products/active'),
@@ -33,7 +33,7 @@ export const productsApi = {
   delete: (id: string) => api.delete(`/products/${id}`),
 };
 
-// Suppliers API
+
 export const suppliersApi = {
   getAll: () => api.get<Supplier[]>('/suppliers'),
   getActive: () => api.get<Supplier[]>('/suppliers/active'),
@@ -43,7 +43,7 @@ export const suppliersApi = {
   delete: (id: string) => api.delete(`/suppliers/${id}`),
 };
 
-// Imports API
+
 export const importsApi = {
   getAll: () => api.get<ImportReceipt[]>('/imports'),
   getOne: (id: string) => api.get<ImportReceipt>(`/imports/${id}`),
@@ -51,7 +51,7 @@ export const importsApi = {
   updateStatus: (id: string, status: string) => api.patch<ImportReceipt>(`/imports/${id}/status`, { status }),
 };
 
-// Exports API
+
 export const exportsApi = {
   getAll: () => api.get<ExportReceipt[]>('/exports'),
   getOne: (id: string) => api.get<ExportReceipt>(`/exports/${id}`),
@@ -59,15 +59,16 @@ export const exportsApi = {
   updateStatus: (id: string, status: string) => api.patch<ExportReceipt>(`/exports/${id}/status`, { status }),
 };
 
-// Inventory API
+
 export const inventoryApi = {
   getAll: () => api.get<Inventory[]>('/inventory'),
   getByWarehouse: (warehouseId: string) => api.get<Inventory[]>(`/inventory/warehouse/${warehouseId}`),
   getByProduct: (productId: string) => api.get<Inventory[]>(`/inventory/product/${productId}`),
   getLowStock: () => api.get<Inventory[]>('/inventory/alerts/low-stock'),
+  updateLocation: (id: string, location: string) => api.patch<Inventory>(`/inventory/${id}/location`, { location }),
 };
 
-// Partners API
+
 export const partnersApi = {
   getAll: () => api.get<Partner[]>('/partners'),
   getOne: (id: string) => api.get<Partner>(`/partners/${id}`),
@@ -76,10 +77,32 @@ export const partnersApi = {
   delete: (id: string) => api.delete(`/partners/${id}`),
 };
 
-// Reports API
+
 export const reportsApi = {
   getInventory: () => api.get('/reports/inventory'),
   getImportExport: (startDate?: string, endDate?: string) => 
     api.get('/reports/import-export', { params: { startDate, endDate } }),
   getDashboard: () => api.get('/reports/dashboard'),
+};
+
+
+export const authApi = {
+  getProfile: () => api.get('/auth/profile'),
+  updateAvatar: (formData: FormData) => 
+    api.post('/auth/profile/avatar', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }),
+  updateProfile: (data: { fullName?: string; phone?: string }) => 
+    api.patch('/auth/profile', data),
+};
+
+
+export const transfersApi = {
+  getAll: () => api.get<TransferReceipt[]>('/transfers'),
+  getOne: (id: string) => api.get<TransferReceipt>(`/transfers/${id}`),
+  create: (data: any) => api.post<TransferReceipt>('/transfers', data),
+  updateStatus: (id: string, status: TransferStatus) => api.patch<TransferReceipt>(`/transfers/${id}/status`, { status }),
+  delete: (id: string) => api.delete(`/transfers/${id}`),
 };

@@ -25,6 +25,8 @@ import {
     Cell
 } from 'recharts';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { saveAs } from 'file-saver';
 import { toast } from 'sonner';
 
@@ -50,7 +52,7 @@ export default function ReportsPage() {
         },
     });
 
-    // Data for Charts
+
     const importExportData = [
         {
             name: 'Tổng quan',
@@ -77,7 +79,7 @@ export default function ReportsPage() {
         try {
             const wb = XLSX.utils.book_new();
 
-            // Sheet 1: Tổng quan
+
             const overviewData = [
                 ['Báo cáo Tổng quan', ''],
                 ['Ngày xuất', new Date().toLocaleDateString()],
@@ -91,7 +93,7 @@ export default function ReportsPage() {
             const wsOverview = XLSX.utils.aoa_to_sheet(overviewData);
             XLSX.utils.book_append_sheet(wb, wsOverview, "Tổng quan");
 
-            // Sheet 2: Nhập xuất
+
             const importExportSheetData = [
                 ['Báo cáo Nhập Xuất', ''],
                 ['Từ ngày', dateRange.startDate],
@@ -115,17 +117,76 @@ export default function ReportsPage() {
         }
     };
 
+    const handleExportPDF = () => {
+        try {
+            const doc = new jsPDF();
+
+
+
+
+
+
+            doc.setFontSize(20);
+            doc.text('BAO CAO KHO HANG', 105, 15, { align: 'center' });
+
+            doc.setFontSize(10);
+            doc.text(`Ngay xuat: ${new Date().toLocaleDateString()}`, 105, 22, { align: 'center' });
+
+
+            doc.setFontSize(14);
+            doc.text('1. Tong quan', 14, 35);
+
+            autoTable(doc, {
+                startY: 40,
+                head: [['Chi so', 'Gia tri']],
+                body: [
+                    ['Tong so san pham', inventoryReport?.totalProducts || 0],
+                    ['Tong so kho', inventoryReport?.totalWarehouses || 0],
+                    ['Tong gia tri ton kho', new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(inventoryReport?.totalValue || 0)],
+                    ['Canh bao ton thap', inventoryReport?.lowStockCount || 0],
+                ],
+            });
+
+
+            doc.setFontSize(14);
+            doc.text('2. Nhap - Xuat (Trong ky)', 14, (doc as any).lastAutoTable.finalY + 15);
+            doc.setFontSize(10);
+            doc.text(`Tu ngay: ${dateRange.startDate} - Den ngay: ${dateRange.endDate}`, 14, (doc as any).lastAutoTable.finalY + 22);
+
+            autoTable(doc, {
+                startY: (doc as any).lastAutoTable.finalY + 25,
+                head: [['Loai', 'So luong phieu', 'Tong gia tri']],
+                body: [
+                    ['Nhap kho', importExportReport?.totalImports || 0, new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(importExportReport?.importAmount || 0)],
+                    ['Xuat kho', importExportReport?.totalExports || 0, new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(importExportReport?.exportAmount || 0)],
+                ],
+            });
+
+            doc.save(`Bao_cao_kho_${new Date().toISOString().split('T')[0]}.pdf`);
+            toast.success('Xuất PDF thành công!');
+        } catch (error) {
+            console.error('Export PDF error:', error);
+            toast.error('Có lỗi khi xuất file PDF');
+        }
+    };
+
     return (
         <div className="space-y-6">
             <PageHeader
                 title="Báo cáo & Phân tích"
                 description="Theo dõi và phân tích hoạt động kho hàng"
-                action={{
-                    label: 'Xuất Excel',
-                    onClick: handleExportExcel,
-                    icon: <Download className="mr-2 h-4 w-4" />
-                }}
-            />
+            >
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={handleExportPDF}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Xuất PDF
+                    </Button>
+                    <Button onClick={handleExportExcel}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Xuất Excel
+                    </Button>
+                </div>
+            </PageHeader>
 
             <Tabs defaultValue="overview" className="space-y-4">
                 <TabsList>
@@ -349,7 +410,53 @@ export default function ReportsPage() {
                                     </div>
                                 </div>
                                 <div className="h-[200px] flex items-center justify-center border rounded-lg bg-muted/10">
-                                    <p className="text-muted-foreground text-sm">Biểu đồ chi tiết sản phẩm sẽ được cập nhật trong phiên bản sau</p>
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={inventoryReport?.topStockItems?.map((item: any) => ({
+                                            name: item.product?.sku || 'Unknown',
+                                            value: item.quantity,
+                                            fullName: item.product?.name
+                                        })) || []} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
+                                            <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                            <XAxis type="number" />
+                                            <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 12 }} />
+                                            <Tooltip
+                                                cursor={{ fill: 'transparent' }}
+                                                content={({ active, payload }) => {
+                                                    if (active && payload && payload.length) {
+                                                        const data = payload[0].payload;
+                                                        return (
+                                                            <div className="rounded-lg border bg-background p-2 shadow-sm">
+                                                                <div className="grid grid-cols-2 gap-2">
+                                                                    <div className="flex flex-col">
+                                                                        <span className="text-[0.70rem] uppercase text-muted-foreground">
+                                                                            Sản phẩm
+                                                                        </span>
+                                                                        <span className="font-bold text-muted-foreground">
+                                                                            {data.fullName}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex flex-col">
+                                                                        <span className="text-[0.70rem] uppercase text-muted-foreground">
+                                                                            Số lượng
+                                                                        </span>
+                                                                        <span className="font-bold">
+                                                                            {data.value}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                }}
+                                            />
+                                            <Bar dataKey="value" fill="#8884d8" radius={[0, 4, 4, 0]}>
+                                                {inventoryReport?.topStockItems?.map((entry: any, index: number) => (
+                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                ))}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
                                 </div>
                             </div>
                         </CardContent>

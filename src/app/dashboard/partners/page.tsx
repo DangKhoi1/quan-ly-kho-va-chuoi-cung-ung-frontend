@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { partnersApi } from '@/services/api';
 import { Partner, PartnerType } from '@/types';
 import { PageHeader } from '@/components/layout/page-header';
@@ -14,16 +14,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Edit, Trash2, Search, Truck } from 'lucide-react';
+import { Edit, Trash2, Search, Truck, MoreHorizontal, Ban, RotateCcw } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
+
 
 export default function PartnersPage() {
     const queryClient = useQueryClient();
     const [search, setSearch] = useState('');
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingPartner, setEditingPartner] = useState<Partner | null>(null);
+    const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('active');
+    const [viewingPartner, setViewingPartner] = useState<Partner | null>(null);
+    const [confirmDialog, setConfirmDialog] = useState<{
+        open: boolean;
+        title: string;
+        description: string;
+        action: () => void;
+        confirmText?: string;
+        variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link' | 'warning';
+    }>({ open: false, title: '', description: '', action: () => { }, confirmText: 'Xóa', variant: 'destructive' });
     const [formData, setFormData] = useState({
         code: '',
         name: '',
@@ -73,6 +84,16 @@ export default function PartnersPage() {
         onError: () => toast.error('Không thể xóa đối tác này!'),
     });
 
+    const toggleStatusMutation = useMutation({
+        mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+            partnersApi.update(id, { isActive }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['partners'] });
+            toast.success('Cập nhật trạng thái thành công!');
+        },
+        onError: () => toast.error('Có lỗi xảy ra!'),
+    });
+
     const handleOpenDialog = (partner?: Partner) => {
         if (partner) {
             setEditingPartner(partner);
@@ -117,13 +138,45 @@ export default function PartnersPage() {
     };
 
     const handleDelete = (id: string) => {
-        if (confirm('Bạn có chắc chắn muốn xóa đối tác này?')) {
-            deleteMutation.mutate(id);
-        }
+        setConfirmDialog({
+            open: true,
+            title: 'Xóa đối tác',
+            description: 'Bạn có chắc chắn muốn xóa đối tác này? Hành động này không thể hoàn tác.',
+            action: () => {
+                deleteMutation.mutate(id);
+                setConfirmDialog((prev) => ({ ...prev, open: false }));
+            },
+            confirmText: 'Xóa',
+            variant: 'destructive',
+        });
+    };
+
+    const handleToggleStatus = (partner: Partner) => {
+        const newStatus = !partner.isActive;
+        const actionText = newStatus ? 'kích hoạt' : 'ngừng hợp tác';
+        setConfirmDialog({
+            open: true,
+            title: newStatus ? 'Kích hoạt lại' : 'Ngừng hợp tác',
+            description: `Bạn có chắc chắn muốn ${actionText} với đối tác "${partner.name}"?`,
+            action: () => {
+                toggleStatusMutation.mutate({ id: partner.id, isActive: newStatus });
+                setConfirmDialog((prev) => ({ ...prev, open: false }));
+            },
+            confirmText: 'Đồng ý',
+            variant: newStatus ? 'default' : 'warning',
+        });
+    };
+
+    const handleViewDetail = (partner: Partner) => {
+        setViewingPartner(partner);
     };
 
     const filteredPartners = partners
-        ?.filter((p) => p.isActive) // Only show active partners
+        ?.filter((p) => {
+            if (statusFilter === 'active') return p.isActive;
+            if (statusFilter === 'inactive') return !p.isActive;
+            return true;
+        })
         ?.filter((p) =>
             p.name.toLowerCase().includes(search.toLowerCase()) ||
             p.code.toLowerCase().includes(search.toLowerCase())
@@ -141,14 +194,31 @@ export default function PartnersPage() {
             />
 
             <Card className="p-4">
-                <div className="flex items-center gap-2">
-                    <Search className="h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Tìm kiếm theo mã hoặc tên đối tác..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="max-w-sm"
-                    />
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 flex-1">
+                        <Search className="h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Tìm kiếm theo mã hoặc tên đối tác..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="max-w-sm"
+                        />
+                    </div>
+                    <div className="w-[200px]">
+                        <Select
+                            value={statusFilter}
+                            onValueChange={(value: 'all' | 'active' | 'inactive') => setStatusFilter(value)}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Trạng thái" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Tất cả</SelectItem>
+                                <SelectItem value="active">Đang hoạt động</SelectItem>
+                                <SelectItem value="inactive">Ngừng hoạt động</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
             </Card>
 
@@ -187,7 +257,11 @@ export default function PartnersPage() {
                             </TableRow>
                         ) : (
                             filteredPartners?.map((partner) => (
-                                <TableRow key={partner.id}>
+                                <TableRow
+                                    key={partner.id}
+                                    className="cursor-pointer hover:bg-muted/50"
+                                    onClick={() => handleViewDetail(partner)}
+                                >
                                     <TableCell className="font-mono">{partner.code}</TableCell>
                                     <TableCell className="font-medium">{partner.name}</TableCell>
                                     <TableCell>
@@ -200,23 +274,46 @@ export default function PartnersPage() {
                                     <TableCell>
                                         <StatusBadge status={partner.isActive ? 'active' : 'inactive'} />
                                     </TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex justify-end gap-2">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => handleOpenDialog(partner)}
-                                            >
-                                                <Edit className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => handleDelete(partner.id)}
-                                            >
-                                                <Trash2 className="h-4 w-4 text-red-500" />
-                                            </Button>
-                                        </div>
+                                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                                    <span className="sr-only">Open menu</span>
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuLabel>Thao tác</DropdownMenuLabel>
+                                                <DropdownMenuItem onClick={() => handleViewDetail(partner)}>
+                                                    <Search className="mr-2 h-4 w-4" />
+                                                    Xem chi tiết
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleOpenDialog(partner)}>
+                                                    <Edit className="mr-2 h-4 w-4" />
+                                                    Sửa thông tin
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleToggleStatus(partner)}>
+                                                    {partner.isActive ? (
+                                                        <>
+                                                            <Ban className="mr-2 h-4 w-4 text-orange-500" />
+                                                            Ngừng hợp tác
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <RotateCcw className="mr-2 h-4 w-4 text-green-500" />
+                                                            Kích hoạt lại
+                                                        </>
+                                                    )}
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    onClick={() => handleDelete(partner.id)}
+                                                    className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                                >
+                                                    <Trash2 className="mr-2 h-4 w-4" />
+                                                    Xóa đối tác
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
                                     </TableCell>
                                 </TableRow>
                             ))
@@ -325,6 +422,104 @@ export default function PartnersPage() {
                             </Button>
                         </DialogFooter>
                     </form>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!viewingPartner} onOpenChange={(open) => !open && setViewingPartner(null)}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Chi tiết đối tác</DialogTitle>
+                    </DialogHeader>
+                    {viewingPartner && (
+                        <div className="grid gap-6 py-4">
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <h4 className="font-medium text-sm text-muted-foreground mb-1">Thông tin chung</h4>
+                                    <div className="space-y-2">
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Mã đối tác:</span>
+                                            <span className="col-span-2 font-mono">{viewingPartner.code}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Tên:</span>
+                                            <span className="col-span-2 font-medium">{viewingPartner.name}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Loại:</span>
+                                            <span className="col-span-2">
+                                                <Badge variant="outline">
+                                                    {viewingPartner.type === PartnerType.SHIPPING ? 'Vận chuyển' : 'Phân phối'}
+                                                </Badge>
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Trạng thái:</span>
+                                            <span className="col-span-2">
+                                                <StatusBadge status={viewingPartner.isActive ? 'active' : 'inactive'} />
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 className="font-medium text-sm text-muted-foreground mb-1">Liên hệ</h4>
+                                    <div className="space-y-2">
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Người LH:</span>
+                                            <span className="col-span-2">{viewingPartner.contactPerson || '-'}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Điện thoại:</span>
+                                            <span className="col-span-2">{viewingPartner.phone || '-'}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Email:</span>
+                                            <span className="col-span-2">{viewingPartner.email || '-'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h4 className="font-medium text-sm text-muted-foreground mb-1">Địa chỉ</h4>
+                                <p className="text-sm">{viewingPartner.address}</p>
+                            </div>
+
+                            {viewingPartner.notes && (
+                                <div>
+                                    <h4 className="font-medium text-sm text-muted-foreground mb-1">Ghi chú</h4>
+                                    <p className="text-sm bg-muted/50 p-2 rounded-md">{viewingPartner.notes}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button onClick={() => setViewingPartner(null)}>Đóng</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog((prev) => ({ ...prev, open }))}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{confirmDialog.title}</DialogTitle>
+                        <DialogDescription className="py-2">
+                            {confirmDialog.description}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setConfirmDialog((prev) => ({ ...prev, open: false }))}
+                        >
+                            Hủy
+                        </Button>
+                        <Button
+                            variant={confirmDialog.variant || 'destructive'}
+                            onClick={confirmDialog.action}
+                        >
+                            {confirmDialog.confirmText || 'Xóa'}
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>

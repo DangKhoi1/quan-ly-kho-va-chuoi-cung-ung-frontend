@@ -18,12 +18,19 @@ export default function RegisterPage() {
     const [formData, setFormData] = useState({
         email: '',
         password: '',
+        confirmPassword: '',
         fullName: '',
     });
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
+
+        if (formData.password !== formData.confirmPassword) {
+            toast.error('Mật khẩu xác nhận không khớp!');
+            setIsLoading(false);
+            return;
+        }
 
         try {
             await register(formData.email, formData.password, formData.fullName);
@@ -35,6 +42,7 @@ export default function RegisterPage() {
             setIsLoading(false);
         }
     };
+
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4">
@@ -84,6 +92,19 @@ export default function RegisterPage() {
                                 placeholder="••••••••"
                                 value={formData.password}
                                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                required
+                                minLength={6}
+                                disabled={isLoading}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="confirmPassword">Nhập lại mật khẩu</Label>
+                            <Input
+                                id="confirmPassword"
+                                type="password"
+                                placeholder="••••••••"
+                                value={formData.confirmPassword}
+                                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                                 required
                                 minLength={6}
                                 disabled={isLoading}

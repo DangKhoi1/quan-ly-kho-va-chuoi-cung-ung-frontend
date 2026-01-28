@@ -6,18 +6,27 @@ import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, TrendingDown, Package, RefreshCw } from 'lucide-react';
+import { AlertTriangle, TrendingDown, Package, RefreshCw, Info, Warehouse } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
+import { useState } from 'react';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+} from '@/components/ui/dialog';
 
 export default function AlertsPage() {
+    const [selectedProduct, setSelectedProduct] = useState<any>(null);
     const { data: lowStockItems, isLoading, refetch } = useQuery({
         queryKey: ['low-stock'],
         queryFn: async () => {
             const response = await inventoryApi.getLowStock();
             return response.data;
         },
-        refetchInterval: 30000, // Auto-refresh every 30 seconds
+        refetchInterval: 30000, 
     });
 
     return (
@@ -162,7 +171,12 @@ export default function AlertsPage() {
                                                 Tạo phiếu nhập
                                             </Button>
                                         </Link>
-                                        <Button size="sm" variant="outline">
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => setSelectedProduct(item)}
+                                        >
+                                            <Info className="h-4 w-4 mr-2" />
                                             Xem chi tiết
                                         </Button>
                                     </div>
@@ -172,6 +186,74 @@ export default function AlertsPage() {
                     })
                 )}
             </div>
+
+            {}
+            <Dialog open={!!selectedProduct} onOpenChange={() => setSelectedProduct(null)}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Chi tiết sản phẩm & Tồn kho</DialogTitle>
+                        <DialogDescription>
+                            Thông tin chi tiết về sản phẩm và tình trạng kho hàng hiện tại.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {selectedProduct && (
+                        <div className="grid gap-6 py-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <p className="text-sm font-medium text-muted-foreground">Tên sản phẩm</p>
+                                    <p className="text-lg font-bold">{selectedProduct.product.name}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-sm font-medium text-muted-foreground">Mã SKU</p>
+                                    <p className="text-lg font-mono">{selectedProduct.product.sku}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-sm font-medium text-muted-foreground">Thương hiệu</p>
+                                    <p>{selectedProduct.product.brand || 'N/A'}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-sm font-medium text-muted-foreground">Đơn vị</p>
+                                    <p>{selectedProduct.product.unit}</p>
+                                </div>
+                            </div>
+
+                            <div className="border rounded-lg p-4 bg-muted/50">
+                                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                                    <Warehouse className="h-4 w-4" />
+                                    Tình trạng tại: {selectedProduct.warehouse.name}
+                                </h4>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="text-center p-2 bg-background rounded border">
+                                        <p className="text-xs text-muted-foreground uppercase">Tồn hiện tại</p>
+                                        <p className="text-xl font-bold text-red-600">{selectedProduct.quantity}</p>
+                                    </div>
+                                    <div className="text-center p-2 bg-background rounded border">
+                                        <p className="text-xs text-muted-foreground uppercase">Mức tối thiểu</p>
+                                        <p className="text-xl font-bold">{selectedProduct.product.minStock}</p>
+                                    </div>
+                                    <div className="text-center p-2 bg-background rounded border">
+                                        <p className="text-xs text-muted-foreground uppercase">Mức tối đa</p>
+                                        <p className="text-xl font-bold">{selectedProduct.product.maxStock}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <p className="text-sm font-medium text-muted-foreground">Giá nhập tham khảo</p>
+                                    <p className="font-bold">
+                                        {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(selectedProduct.product.costPrice)}
+                                    </p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-sm font-medium text-muted-foreground">Vị trí trong kho</p>
+                                    <p>{selectedProduct.location || 'Chưa xác định'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
 
             <Card className="border-yellow-500/50 bg-yellow-50/50">
                 <CardContent className="p-6">

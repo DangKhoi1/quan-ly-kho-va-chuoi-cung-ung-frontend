@@ -10,6 +10,7 @@ export interface User {
   fullName: string;
   phone?: string;
   role: UserRole;
+  avatar?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -210,4 +211,35 @@ export interface RegisterRequest {
   email: string;
   password: string;
   fullName: string;
+}
+
+export enum TransferStatus {
+  PENDING = 'PENDING',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+}
+
+export interface TransferItem {
+  id: string;
+  transferReceiptId: string;
+  productId: string;
+  product: Product;
+  quantity: number;
+}
+
+export interface TransferReceipt {
+  id: string;
+  code: string;
+  exportWarehouseId: string;
+  exportWarehouse: Warehouse;
+  importWarehouseId: string;
+  importWarehouse: Warehouse;
+  transferDate: string;
+  status: TransferStatus;
+  note?: string;
+  items: TransferItem[];
+  createdById: string;
+  createdBy: User;
+  createdAt: string;
+  updatedAt: string;
 }

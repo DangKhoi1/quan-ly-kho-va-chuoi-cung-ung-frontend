@@ -145,7 +145,7 @@ export default function ProductsPage() {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Clean data before sending
+
         const submitData = {
             ...formData,
             categoryId: formData.categoryId === '' ? undefined : formData.categoryId,
@@ -163,7 +163,9 @@ export default function ProductsPage() {
         title: string;
         description: string;
         action: () => void;
-    }>({ open: false, title: '', description: '', action: () => { } });
+        confirmText?: string;
+        variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link' | 'warning';
+    }>({ open: false, title: '', description: '', action: () => { }, confirmText: 'Xóa', variant: 'destructive' });
 
     const handleDelete = (id: string) => {
         setConfirmDialog({
@@ -174,6 +176,8 @@ export default function ProductsPage() {
                 deleteMutation.mutate(id);
                 setConfirmDialog((prev) => ({ ...prev, open: false }));
             },
+            confirmText: 'Xóa',
+            variant: 'destructive',
         });
     };
 
@@ -188,6 +192,8 @@ export default function ProductsPage() {
                 toggleStatusMutation.mutate({ id: product.id, isActive: newStatus });
                 setConfirmDialog((prev) => ({ ...prev, open: false }));
             },
+            confirmText: 'Đồng ý',
+            variant: newStatus ? 'default' : 'warning',
         });
     };
 
@@ -200,6 +206,12 @@ export default function ProductsPage() {
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+    };
+
+    const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
+
+    const handleViewDetail = (product: Product) => {
+        setViewingProduct(product);
     };
 
     return (
@@ -286,7 +298,11 @@ export default function ProductsPage() {
                             </TableRow>
                         ) : (
                             filteredProducts?.map((product) => (
-                                <TableRow key={product.id}>
+                                <TableRow
+                                    key={product.id}
+                                    className="cursor-pointer hover:bg-muted/50"
+                                    onClick={() => handleViewDetail(product)}
+                                >
                                     <TableCell className="font-mono">{product.sku}</TableCell>
                                     <TableCell className="font-medium">{product.name}</TableCell>
                                     <TableCell>
@@ -298,7 +314,7 @@ export default function ProductsPage() {
                                     <TableCell>
                                         <StatusBadge status={product.isActive ? 'active' : 'inactive'} />
                                     </TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
                                                 <Button variant="ghost" className="h-8 w-8 p-0">
@@ -308,6 +324,10 @@ export default function ProductsPage() {
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuLabel>Thao tác</DropdownMenuLabel>
+                                                <DropdownMenuItem onClick={() => handleViewDetail(product)}>
+                                                    <Search className="mr-2 h-4 w-4" />
+                                                    Xem chi tiết
+                                                </DropdownMenuItem>
                                                 <DropdownMenuItem onClick={() => handleOpenDialog(product)}>
                                                     <Edit className="mr-2 h-4 w-4" />
                                                     Sửa sản phẩm
@@ -487,6 +507,98 @@ export default function ProductsPage() {
                 </DialogContent>
             </Dialog>
 
+            <Dialog open={!!viewingProduct} onOpenChange={(open) => !open && setViewingProduct(null)}>
+                <DialogContent className="max-w-3xl">
+                    <DialogHeader>
+                        <DialogTitle>Chi tiết sản phẩm</DialogTitle>
+                    </DialogHeader>
+                    {viewingProduct && (
+                        <div className="grid gap-6 py-4">
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <h4 className="font-medium text-sm text-muted-foreground mb-1">Thông tin chung</h4>
+                                    <div className="space-y-2">
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">SKU:</span>
+                                            <span className="col-span-2 font-mono">{viewingProduct.sku}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Tên:</span>
+                                            <span className="col-span-2 font-medium">{viewingProduct.name}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Danh mục:</span>
+                                            <span className="col-span-2">
+                                                <Badge variant="outline">{viewingProduct.category?.name || '-'}</Badge>
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Trạng thái:</span>
+                                            <span className="col-span-2">
+                                                <StatusBadge status={viewingProduct.isActive ? 'active' : 'inactive'} />
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 className="font-medium text-sm text-muted-foreground mb-1">Đặc điểm</h4>
+                                    <div className="space-y-2">
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Thương hiệu:</span>
+                                            <span className="col-span-2">{viewingProduct.brand || '-'}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Model:</span>
+                                            <span className="col-span-2">{viewingProduct.model || '-'}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Đơn vị:</span>
+                                            <span className="col-span-2">{viewingProduct.unit}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h4 className="font-medium text-sm text-muted-foreground mb-1">Giá & Tồn kho</h4>
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Giá vốn:</span>
+                                            <span className="col-span-2">{formatCurrency(viewingProduct.costPrice)}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Giá bán:</span>
+                                            <span className="col-span-2 font-medium text-green-600">{formatCurrency(viewingProduct.sellingPrice)}</span>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="grid grid-cols-[120px_1fr] text-sm">
+                                            <span className="text-muted-foreground">Tồn tối thiểu:</span>
+                                            <span>{viewingProduct.minStock}</span>
+                                        </div>
+                                        <div className="grid grid-cols-[120px_1fr] text-sm">
+                                            <span className="text-muted-foreground">Tồn tối đa:</span>
+                                            <span>{viewingProduct.maxStock}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {viewingProduct.description && (
+                                <div>
+                                    <h4 className="font-medium text-sm text-muted-foreground mb-1">Mô tả</h4>
+                                    <p className="text-sm bg-muted/50 p-2 rounded-md">{viewingProduct.description}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button onClick={() => setViewingProduct(null)}>Đóng</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             <Dialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog((prev) => ({ ...prev, open }))}>
                 <DialogContent>
                     <DialogHeader>
@@ -503,10 +615,10 @@ export default function ProductsPage() {
                             Hủy
                         </Button>
                         <Button
-                            variant="destructive"
+                            variant={confirmDialog.variant || 'destructive'}
                             onClick={confirmDialog.action}
                         >
-                            Xóa
+                            {confirmDialog.confirmText || 'Xóa'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

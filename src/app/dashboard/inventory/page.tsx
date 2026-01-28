@@ -11,10 +11,16 @@ import { Badge } from '@/components/ui/badge';
 import { Search, AlertCircle, Package } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EditLocationDialog } from './edit-location-dialog';
+
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Inventory } from '@/types';
+import { format } from 'date-fns';
 
 export default function InventoryPage() {
     const [search, setSearch] = useState('');
     const [warehouseFilter, setWarehouseFilter] = useState<string>('all');
+    const [viewingInventory, setViewingInventory] = useState<Inventory | null>(null);
 
     const { data: inventory, isLoading } = useQuery({
         queryKey: ['inventory'],
@@ -93,6 +99,7 @@ export default function InventoryPage() {
                             <TableHead className="text-right">Min</TableHead>
                             <TableHead className="text-right">Max</TableHead>
                             <TableHead>Trạng thái</TableHead>
+                            <TableHead>Vị trí</TableHead>
                             <TableHead>Cập nhật</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -123,7 +130,11 @@ export default function InventoryPage() {
                                 const StatusIcon = status.icon;
 
                                 return (
-                                    <TableRow key={item.id}>
+                                    <TableRow
+                                        key={item.id}
+                                        className="cursor-pointer hover:bg-muted/50"
+                                        onClick={() => setViewingInventory(item)}
+                                    >
                                         <TableCell className="font-mono">{item.product.sku}</TableCell>
                                         <TableCell className="font-medium">{item.product.name}</TableCell>
                                         <TableCell>{item.warehouse.name}</TableCell>
@@ -140,6 +151,18 @@ export default function InventoryPage() {
                                                 {status.label}
                                             </Badge>
                                         </TableCell>
+                                        <TableCell onClick={(e) => e.stopPropagation()}>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium">
+                                                    {item.location || <span className="text-muted-foreground italic">Chưa xếp</span>}
+                                                </span>
+                                                <EditLocationDialog
+                                                    inventoryId={item.id}
+                                                    currentLocation={item.location}
+                                                    productName={item.product.name}
+                                                />
+                                            </div>
+                                        </TableCell>
                                         <TableCell className="text-sm text-muted-foreground">
                                             {new Date(item.updatedAt).toLocaleDateString('vi-VN')}
                                         </TableCell>
@@ -150,6 +173,79 @@ export default function InventoryPage() {
                     </TableBody>
                 </Table>
             </Card>
+
+            <Dialog open={!!viewingInventory} onOpenChange={() => setViewingInventory(null)}>
+                <DialogContent className="sm:max-w-xl">
+                    <DialogHeader>
+                        <DialogTitle>Chi tiết tồn kho</DialogTitle>
+                    </DialogHeader>
+                    {viewingInventory && (
+                        <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Sản phẩm</p>
+                                    <p className="font-medium">{viewingInventory.product.name}</p>
+                                    <p className="text-xs text-muted-foreground">{viewingInventory.product.sku}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Kho lưu trữ</p>
+                                    <p className="font-medium">{viewingInventory.warehouse.name}</p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-4 border-t pt-4">
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Số lượng tồn</p>
+                                    <p className="text-2xl font-bold text-primary">{viewingInventory.quantity}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Định mức Min</p>
+                                    <p className="font-medium">{viewingInventory.product.minStock}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Định mức Max</p>
+                                    <p className="font-medium">{viewingInventory.product.maxStock}</p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 border-t pt-4">
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Vị trí</p>
+                                    <div className="flex items-center gap-2">
+                                        <p className="font-medium">
+                                            {viewingInventory.location || <span className="italic text-muted-foreground">Chưa xếp</span>}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Cập nhật lần cuối</p>
+                                    <p className="font-medium">
+                                        {format(new Date(viewingInventory.updatedAt), 'HH:mm dd/MM/yyyy')}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="bg-muted/30 p-3 rounded-lg border">
+                                <p className="text-sm font-medium mb-1">Trạng thái tồn kho</p>
+                                {(() => {
+                                    const status = getStockStatus(
+                                        viewingInventory.quantity,
+                                        viewingInventory.product.minStock,
+                                        viewingInventory.product.maxStock
+                                    );
+                                    const StatusIcon = status.icon;
+                                    return (
+                                        <div className={`flex items-center gap-2 p-2 rounded ${status.color.replace('bg-', 'bg-opacity-20 ')}`}>
+                                            <StatusIcon className="h-4 w-4" />
+                                            <span className="font-medium">{status.label}</span>
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

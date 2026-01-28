@@ -13,10 +13,12 @@ import {
     Truck,
     LogOut,
     ShoppingCart,
-    PackageOpen
+    PackageOpen,
+    ArrowRightLeft
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { NotificationBell } from '@/components/layout/notification-bell';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -29,6 +31,7 @@ const navItems = [
     { icon: PackageOpen, label: 'Nhập kho', href: '/dashboard/imports' },
     { icon: ShoppingCart, label: 'Xuất kho', href: '/dashboard/exports' },
     { icon: FileText, label: 'Tồn kho', href: '/dashboard/inventory' },
+    { icon: ArrowRightLeft, label: 'Chuyển kho', href: '/dashboard/transfers' },
     { icon: Truck, label: 'Đối tác', href: '/dashboard/partners' },
     { icon: TrendingUp, label: 'Báo cáo', href: '/dashboard/reports' },
 ];
@@ -43,7 +46,7 @@ export default function DashboardLayout({
     const { isAuthenticated, user, logout, hasHydrated } = useAuthStore();
 
     useEffect(() => {
-        // Wait for store to hydrate before checking auth
+
         if (hasHydrated && !isAuthenticated) {
             router.push('/login');
         }
@@ -54,7 +57,7 @@ export default function DashboardLayout({
         router.push('/login');
     };
 
-    // Show loading while hydrating
+
     if (!hasHydrated) {
         return (
             <div className="flex h-screen items-center justify-center">
@@ -66,23 +69,25 @@ export default function DashboardLayout({
         );
     }
 
-    // Show nothing while redirecting to login
+
     if (!isAuthenticated) {
         return null;
     }
 
     return (
         <div className="flex h-screen bg-muted/20">
-            {/* Sidebar */}
+            { }
             <aside className="w-64 border-r bg-card">
                 <div className="flex h-full flex-col">
-                    {/* Logo */}
+                    { }
                     <div className="flex h-16 items-center border-b px-6">
-                        <Package className="h-6 w-6 text-primary" />
-                        <span className="ml-2 font-semibold text-lg">Kho Manager</span>
+                        <Link href="/dashboard" className="flex items-center gap-2 flex-1 hover:opacity-80 transition-opacity">
+                            <Package className="h-6 w-6 text-primary" />
+                            <span className="font-semibold text-lg flex-1 whitespace-nowrap">Warehouse Manager</span>
+                        </Link>
                     </div>
 
-                    {/* Navigation */}
+                    { }
                     <nav className="flex-1 overflow-y-auto p-4">
                         <div className="space-y-1">
                             {navItems.map((item) => {
@@ -108,17 +113,27 @@ export default function DashboardLayout({
                         </div>
                     </nav>
 
-                    {/* User info */}
+                    { }
                     <div className="border-t p-4">
-                        <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-3">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                                {user?.fullName.charAt(0).toUpperCase()}
+                        <Link href="/dashboard/profile">
+                            <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-3 hover:bg-muted transition-colors cursor-pointer border border-transparent hover:border-primary/20">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground overflow-hidden">
+                                    {user?.avatar ? (
+                                        <img
+                                            src={`http://localhost:3001${user.avatar}`}
+                                            alt={user.fullName}
+                                            className="h-full w-full object-cover"
+                                        />
+                                    ) : (
+                                        user?.fullName.charAt(0).toUpperCase()
+                                    )}
+                                </div>
+                                <div className="flex-1 overflow-hidden">
+                                    <p className="text-sm font-medium truncate">{user?.fullName}</p>
+                                    <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                                </div>
                             </div>
-                            <div className="flex-1 overflow-hidden">
-                                <p className="text-sm font-medium truncate">{user?.fullName}</p>
-                                <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-                            </div>
-                        </div>
+                        </Link>
                         <Separator className="my-3" />
                         <Button
                             variant="ghost"
@@ -132,12 +147,18 @@ export default function DashboardLayout({
                 </div>
             </aside>
 
+            { }
             {/* Main content */}
-            <main className="flex-1 overflow-y-auto">
-                <div className="container mx-auto p-6">
-                    {children}
-                </div>
-            </main>
+            <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                <header className="flex h-14 lg:h-[60px] items-center gap-4 border-b bg-background px-6 justify-end shrink-0">
+                    <NotificationBell />
+                </header>
+                <main className="flex-1 overflow-y-auto">
+                    <div className="container mx-auto p-6">
+                        {children}
+                    </div>
+                </main>
+            </div>
         </div>
     );
 }

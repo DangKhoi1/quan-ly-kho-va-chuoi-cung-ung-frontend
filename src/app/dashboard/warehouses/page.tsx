@@ -138,7 +138,9 @@ export default function WarehousesPage() {
         title: string;
         description: string;
         action: () => void;
-    }>({ open: false, title: '', description: '', action: () => { } });
+        confirmText?: string;
+        variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link' | 'warning';
+    }>({ open: false, title: '', description: '', action: () => { }, confirmText: 'Xóa', variant: 'destructive' });
 
     const handleDelete = (id: string) => {
         setConfirmDialog({
@@ -149,6 +151,8 @@ export default function WarehousesPage() {
                 deleteMutation.mutate(id);
                 setConfirmDialog((prev) => ({ ...prev, open: false }));
             },
+            confirmText: 'Xóa',
+            variant: 'destructive',
         });
     };
 
@@ -163,6 +167,8 @@ export default function WarehousesPage() {
                 toggleStatusMutation.mutate({ id: warehouse.id, isActive: newStatus });
                 setConfirmDialog((prev) => ({ ...prev, open: false }));
             },
+            confirmText: 'Đồng ý',
+            variant: newStatus ? 'default' : 'warning',
         });
     };
 
@@ -176,6 +182,12 @@ export default function WarehousesPage() {
             w.name.toLowerCase().includes(search.toLowerCase()) ||
             w.address.toLowerCase().includes(search.toLowerCase())
         );
+
+    const [viewingWarehouse, setViewingWarehouse] = useState<Warehouse | null>(null);
+
+    const handleViewDetail = (warehouse: Warehouse) => {
+        setViewingWarehouse(warehouse);
+    };
 
     return (
         <div className="space-y-6">
@@ -252,7 +264,11 @@ export default function WarehousesPage() {
                             </TableRow>
                         ) : (
                             filteredWarehouses?.map((warehouse) => (
-                                <TableRow key={warehouse.id}>
+                                <TableRow
+                                    key={warehouse.id}
+                                    className="cursor-pointer hover:bg-muted/50"
+                                    onClick={() => handleViewDetail(warehouse)}
+                                >
                                     <TableCell className="font-medium">{warehouse.name}</TableCell>
                                     <TableCell>
                                         <StatusBadge status={warehouse.type === 'main' ? 'Kho chính' : 'Chi nhánh'} />
@@ -263,7 +279,7 @@ export default function WarehousesPage() {
                                     <TableCell>
                                         <StatusBadge status={warehouse.isActive ? 'active' : 'inactive'} />
                                     </TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
                                                 <Button variant="ghost" className="h-8 w-8 p-0">
@@ -273,6 +289,10 @@ export default function WarehousesPage() {
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuLabel>Thao tác</DropdownMenuLabel>
+                                                <DropdownMenuItem onClick={() => handleViewDetail(warehouse)}>
+                                                    <Search className="mr-2 h-4 w-4" />
+                                                    Xem chi tiết
+                                                </DropdownMenuItem>
                                                 <DropdownMenuItem onClick={() => handleOpenDialog(warehouse)}>
                                                     <Edit className="mr-2 h-4 w-4" />
                                                     Sửa thông tin
@@ -395,6 +415,69 @@ export default function WarehousesPage() {
                 </DialogContent>
             </Dialog>
 
+            <Dialog open={!!viewingWarehouse} onOpenChange={(open) => !open && setViewingWarehouse(null)}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Chi tiết kho hàng</DialogTitle>
+                    </DialogHeader>
+                    {viewingWarehouse && (
+                        <div className="grid gap-6 py-4">
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <h4 className="font-medium text-sm text-muted-foreground mb-1">Thông tin chung</h4>
+                                    <div className="space-y-2">
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Tên kho:</span>
+                                            <span className="col-span-2 font-medium">{viewingWarehouse.name}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Loại kho:</span>
+                                            <span className="col-span-2">
+                                                <StatusBadge status={viewingWarehouse.type === 'main' ? 'Kho chính' : 'Chi nhánh'} />
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Trạng thái:</span>
+                                            <span className="col-span-2">
+                                                <StatusBadge status={viewingWarehouse.isActive ? 'active' : 'inactive'} />
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 className="font-medium text-sm text-muted-foreground mb-1">Quản lý & Liên hệ</h4>
+                                    <div className="space-y-2">
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Quản lý:</span>
+                                            <span className="col-span-2">{viewingWarehouse.manager || '-'}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Điện thoại:</span>
+                                            <span className="col-span-2">{viewingWarehouse.phone || '-'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h4 className="font-medium text-sm text-muted-foreground mb-1">Địa chỉ</h4>
+                                <p className="text-sm">{viewingWarehouse.address}</p>
+                            </div>
+
+                            {viewingWarehouse.description && (
+                                <div>
+                                    <h4 className="font-medium text-sm text-muted-foreground mb-1">Mô tả</h4>
+                                    <p className="text-sm bg-muted/50 p-2 rounded-md">{viewingWarehouse.description}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button onClick={() => setViewingWarehouse(null)}>Đóng</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             <Dialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog((prev) => ({ ...prev, open }))}>
                 <DialogContent>
                     <DialogHeader>
@@ -411,10 +494,10 @@ export default function WarehousesPage() {
                             Hủy
                         </Button>
                         <Button
-                            variant="destructive"
+                            variant={confirmDialog.variant || 'destructive'}
                             onClick={confirmDialog.action}
                         >
-                            Xóa
+                            {confirmDialog.confirmText || 'Xóa'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

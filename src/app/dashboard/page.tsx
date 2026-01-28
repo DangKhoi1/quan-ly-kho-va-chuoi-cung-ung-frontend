@@ -85,7 +85,7 @@ export default function DashboardPage() {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
+            {}
             <div>
                 <h1 className="text-3xl font-bold">Dashboard</h1>
                 <p className="text-muted-foreground mt-1">
@@ -93,7 +93,7 @@ export default function DashboardPage() {
                 </p>
             </div>
 
-            {/* Stats Grid */}
+            {}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 {stats.map((stat) => {
                     const Icon = stat.icon;
@@ -120,7 +120,7 @@ export default function DashboardPage() {
                 })}
             </div>
 
-            {/* Recent Activities */}
+            {}
             <div className="grid gap-4 md:grid-cols-2">
                 {recentActivities.map((activity) => (
                     <Link key={activity.title} href={activity.href}>
@@ -146,7 +146,7 @@ export default function DashboardPage() {
                 ))}
             </div>
 
-            {/* Quick Actions */}
+            {}
             <Card>
                 <CardHeader>
                     <CardTitle>Thao tác nhanh</CardTitle>

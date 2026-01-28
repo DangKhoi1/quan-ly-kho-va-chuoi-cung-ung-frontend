@@ -143,8 +143,9 @@ export default function SuppliersPage() {
         title: string;
         description: React.ReactNode;
         action: () => void;
-        variant?: 'destructive' | 'default';
-    }>({ open: false, title: '', description: '', action: () => { } });
+        variant?: 'destructive' | 'default' | 'warning';
+        confirmText?: string;
+    }>({ open: false, title: '', description: '', action: () => { }, variant: 'destructive', confirmText: 'Xóa' });
 
     const handleDelete = (id: string) => {
         setConfirmDialog({
@@ -152,6 +153,7 @@ export default function SuppliersPage() {
             title: 'Xóa nhà cung cấp',
             description: 'Bạn có chắc chắn muốn xóa nhà cung cấp này? Hành động này không thể hoàn tác.',
             variant: 'destructive',
+            confirmText: 'Xóa',
             action: () => {
                 deleteMutation.mutate(id);
                 setConfirmDialog((prev) => ({ ...prev, open: false }));
@@ -170,7 +172,8 @@ export default function SuppliersPage() {
                     Bạn có chắc chắn muốn <strong>{actionText}</strong> nhà cung cấp <strong>{supplier.name}</strong>?
                 </span>
             ),
-            variant: newStatus ? 'default' : 'destructive',
+            variant: newStatus ? 'default' : 'warning',
+            confirmText: 'Đồng ý',
             action: () => {
                 toggleStatusMutation.mutate({ id: supplier.id, isActive: newStatus });
                 setConfirmDialog((prev) => ({ ...prev, open: false }));
@@ -189,6 +192,12 @@ export default function SuppliersPage() {
             s.code.toLowerCase().includes(search.toLowerCase()) ||
             s.contactPerson?.toLowerCase().includes(search.toLowerCase())
         );
+
+    const [viewingSupplier, setViewingSupplier] = useState<Supplier | null>(null);
+
+    const handleViewDetail = (supplier: Supplier) => {
+        setViewingSupplier(supplier);
+    };
 
     return (
         <div className="space-y-6">
@@ -265,7 +274,11 @@ export default function SuppliersPage() {
                             </TableRow>
                         ) : (
                             filteredSuppliers?.map((supplier) => (
-                                <TableRow key={supplier.id}>
+                                <TableRow
+                                    key={supplier.id}
+                                    className="cursor-pointer hover:bg-muted/50"
+                                    onClick={() => handleViewDetail(supplier)}
+                                >
                                     <TableCell className="font-mono">{supplier.code}</TableCell>
                                     <TableCell className="font-medium">{supplier.name}</TableCell>
                                     <TableCell>{supplier.contactPerson || '-'}</TableCell>
@@ -274,7 +287,7 @@ export default function SuppliersPage() {
                                     <TableCell>
                                         <StatusBadge status={supplier.isActive ? 'active' : 'inactive'} />
                                     </TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
                                                 <Button variant="ghost" className="h-8 w-8 p-0">
@@ -284,6 +297,10 @@ export default function SuppliersPage() {
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuLabel>Thao tác</DropdownMenuLabel>
+                                                <DropdownMenuItem onClick={() => handleViewDetail(supplier)}>
+                                                    <Search className="mr-2 h-4 w-4" />
+                                                    Xem chi tiết
+                                                </DropdownMenuItem>
                                                 <DropdownMenuItem onClick={() => handleOpenDialog(supplier)}>
                                                     <Edit className="mr-2 h-4 w-4" />
                                                     Sửa thông tin
@@ -432,6 +449,84 @@ export default function SuppliersPage() {
                 </DialogContent>
             </Dialog>
 
+            <Dialog open={!!viewingSupplier} onOpenChange={(open) => !open && setViewingSupplier(null)}>
+                <DialogContent className="max-w-3xl">
+                    <DialogHeader>
+                        <DialogTitle>Chi tiết nhà cung cấp</DialogTitle>
+                    </DialogHeader>
+                    {viewingSupplier && (
+                        <div className="grid gap-6 py-4">
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <h4 className="font-medium text-sm text-muted-foreground mb-1">Thông tin chung</h4>
+                                    <div className="space-y-2">
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Mã NCC:</span>
+                                            <span className="col-span-2 font-mono">{viewingSupplier.code}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Tên NCC:</span>
+                                            <span className="col-span-2 font-medium">{viewingSupplier.name}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Trạng thái:</span>
+                                            <span className="col-span-2">
+                                                <StatusBadge status={viewingSupplier.isActive ? 'active' : 'inactive'} />
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 className="font-medium text-sm text-muted-foreground mb-1">Liên hệ</h4>
+                                    <div className="space-y-2">
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Người liên hệ:</span>
+                                            <span className="col-span-2">{viewingSupplier.contactPerson || '-'}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Điện thoại:</span>
+                                            <span className="col-span-2">{viewingSupplier.phone || '-'}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 text-sm">
+                                            <span className="text-muted-foreground">Email:</span>
+                                            <span className="col-span-2">{viewingSupplier.email || '-'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h4 className="font-medium text-sm text-muted-foreground mb-1">Địa chỉ & Tài chính</h4>
+                                <div className="space-y-2">
+                                    <div className="grid grid-cols-[120px_1fr] text-sm">
+                                        <span className="text-muted-foreground">Địa chỉ:</span>
+                                        <span>{viewingSupplier.address || '-'}</span>
+                                    </div>
+                                    <div className="grid grid-cols-[120px_1fr] text-sm">
+                                        <span className="text-muted-foreground">Mã số thuế:</span>
+                                        <span>{viewingSupplier.taxCode || '-'}</span>
+                                    </div>
+                                    <div className="grid grid-cols-[120px_1fr] text-sm">
+                                        <span className="text-muted-foreground">Ngân hàng:</span>
+                                        <span>{viewingSupplier.bankName ? `${viewingSupplier.bankName} - ${viewingSupplier.bankAccount}` : '-'}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {viewingSupplier.notes && (
+                                <div>
+                                    <h4 className="font-medium text-sm text-muted-foreground mb-1">Ghi chú</h4>
+                                    <p className="text-sm bg-muted/50 p-2 rounded-md">{viewingSupplier.notes}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button onClick={() => setViewingSupplier(null)}>Đóng</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             <Dialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog((prev) => ({ ...prev, open }))}>
                 <DialogContent>
                     <DialogHeader>
@@ -451,7 +546,7 @@ export default function SuppliersPage() {
                             variant={confirmDialog.variant || 'default'}
                             onClick={confirmDialog.action}
                         >
-                            Xác nhận
+                            {confirmDialog.confirmText || 'Xác nhận'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

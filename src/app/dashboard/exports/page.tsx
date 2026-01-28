@@ -103,8 +103,12 @@ export default function ExportsPage() {
             queryClient.invalidateQueries({ queryKey: ['inventory'] });
             toast.success('Cập nhật trạng thái thành công!');
             setViewReceipt(null);
+            setConfirmDialog(prev => ({ ...prev, open: false }));
         },
-        onError: () => toast.error('Có lỗi xảy ra!'),
+        onError: (error: any) => {
+            const message = error.response?.data?.message || 'Có lỗi xảy ra!';
+            toast.error(Array.isArray(message) ? message[0] : message);
+        },
     });
 
     const handleCloseDialog = () => {
@@ -133,13 +137,22 @@ export default function ExportsPage() {
         const newLines = [...productLines];
         newLines[index] = { ...newLines[index], [field]: value };
 
-        // Check available stock when product or warehouse changes
-        if (field === 'productId' && formData.warehouseId) {
-            const productId = value;
-            const stock = inventory?.find(
-                (inv) => inv.productId === productId && inv.warehouseId === formData.warehouseId
-            );
-            newLines[index].availableStock = stock?.quantity || 0;
+
+        if (field === 'productId') {
+            const product = products?.find((p) => p.id === value);
+            if (product) {
+                // If SALE -> Selling Price, Otherwise (Transfer/Return) -> Cost Price
+                newLines[index].unitPrice = Number(formData.exportType === ExportType.SALE
+                    ? product.sellingPrice
+                    : product.costPrice);
+            }
+
+            if (formData.warehouseId) {
+                const stock = inventory?.find(
+                    (inv) => inv.productId === value && inv.warehouseId === formData.warehouseId
+                );
+                newLines[index].availableStock = stock?.quantity || 0;
+            }
         }
 
         setProductLines(newLines);
@@ -148,7 +161,7 @@ export default function ExportsPage() {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Validate required fields
+
         if (!formData.exportDate) {
             toast.error('Vui lòng chọn ngày xuất!');
             return;
@@ -168,7 +181,7 @@ export default function ExportsPage() {
             return;
         }
 
-        // Validate stock
+
         for (const line of validLines) {
             if (line.availableStock !== undefined && line.quantity > line.availableStock) {
                 const product = products?.find((p) => p.id === line.productId);
@@ -191,9 +204,30 @@ export default function ExportsPage() {
     };
 
     const handleUpdateStatus = (id: string, status: ExportStatus) => {
-        if (confirm(`Bạn có chắc chắn muốn chuyển sang trạng thái "${status}"?`)) {
-            updateStatusMutation.mutate({ id, status });
+        let title = '';
+        let description = '';
+
+        switch (status) {
+            case ExportStatus.APPROVED:
+                title = 'Duyệt phiếu xuất';
+                description = 'Bạn có chắc chắn muốn duyệt phiếu xuất này? Trạng thái sẽ chuyển thành "Đã duyệt".';
+                break;
+            case ExportStatus.COMPLETED:
+                title = 'Hoàn thành xuất kho';
+                description = 'Xác nhận hàng đã thực tế xuất kho. Hành động này sẽ cập nhật số lượng tồn kho và không thể hoàn tác.';
+                break;
+            case ExportStatus.CANCELLED:
+                title = 'Hủy phiếu xuất';
+                description = 'Bạn có chắc chắn muốn hủy phiếu xuất này? Trạng thái sẽ chuyển thành "Đã hủy".';
+                break;
         }
+
+        setConfirmDialog({
+            open: true,
+            title,
+            description,
+            action: () => updateStatusMutation.mutate({ id, status }),
+        });
     };
 
     const totalAmount = productLines.reduce(
@@ -209,10 +243,10 @@ export default function ExportsPage() {
         return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
     };
 
-    // Update stock info when warehouse changes
+
     const handleWarehouseChange = (warehouseId: string) => {
         setFormData({ ...formData, warehouseId });
-        // Update available stock for all lines
+
         const updatedLines = productLines.map((line) => {
             if (line.productId) {
                 const stock = inventory?.find(
@@ -329,215 +363,222 @@ export default function ExportsPage() {
                 )}
             </div>
 
-            {/* Create Dialog */}
+            { }
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
+                <DialogContent className="sm:max-w-[1100px] h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
+                    <DialogHeader className="px-6 py-4 border-b shrink-0">
                         <DialogTitle>Tạo phiếu xuất kho</DialogTitle>
                         <DialogDescription>Nhập thông tin phiếu xuất và danh sách sản phẩm</DialogDescription>
                     </DialogHeader>
-                    <form onSubmit={handleSubmit}>
-                        <div className="grid gap-4 py-4">
-                            <div className="grid gap-6 py-4">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="exportDate">Ngày xuất *</Label>
-                                        <Input
-                                            id="exportDate"
-                                            type="date"
-                                            value={formData.exportDate}
-                                            onChange={(e) => setFormData({ ...formData, exportDate: e.target.value })}
-                                            className="w-full"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="warehouseId">Kho xuất *</Label>
-                                        <Select
-                                            value={formData.warehouseId}
-                                            onValueChange={handleWarehouseChange}
-                                        >
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue placeholder="Chọn kho xuất hàng" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {warehouses?.map((wh) => (
-                                                    <SelectItem key={wh.id} value={wh.id}>
-                                                        {wh.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                    <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+                        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="exportDate">Ngày xuất *</Label>
+                                    <Input
+                                        id="exportDate"
+                                        type="date"
+                                        value={formData.exportDate}
+                                        onChange={(e) => setFormData({ ...formData, exportDate: e.target.value })}
+                                        className="h-9"
+                                    />
                                 </div>
-
-                                <div className="space-y-2">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="warehouseId">Kho xuất *</Label>
+                                    <Select
+                                        value={formData.warehouseId}
+                                        onValueChange={handleWarehouseChange}
+                                    >
+                                        <SelectTrigger className="h-9">
+                                            <SelectValue placeholder="Chọn kho" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {warehouses?.map((wh) => (
+                                                <SelectItem key={wh.id} value={wh.id}>
+                                                    {wh.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1.5">
                                     <Label htmlFor="exportType">Loại xuất *</Label>
                                     <Select
                                         value={formData.exportType}
-                                        onValueChange={(value: ExportType) =>
-                                            setFormData({ ...formData, exportType: value })
-                                        }
+                                        onValueChange={(value: ExportType) => {
+                                            setFormData({ ...formData, exportType: value });
+                                            // Recalculate prices for existing lines based on new type
+                                            const newLines = productLines.map(line => {
+                                                if (!line.productId) return line;
+                                                const product = products?.find(p => p.id === line.productId);
+                                                if (!product) return line;
+                                                const price = value === ExportType.SALE ? product.sellingPrice : product.costPrice;
+                                                return {
+                                                    ...line,
+                                                    unitPrice: Number(price)
+                                                };
+                                            });
+                                            setProductLines(newLines);
+                                        }}
                                     >
-                                        <SelectTrigger className="w-full">
+                                        <SelectTrigger className="h-9">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value={ExportType.SALE}>Bán hàng</SelectItem>
-                                            <SelectItem value={ExportType.TRANSFER}>Chuyển kho</SelectItem>
-                                            <SelectItem value={ExportType.RETURN}>Trả hàng</SelectItem>
-                                            <SelectItem value={ExportType.OTHER}>Khác</SelectItem>
+                                            <SelectItem value={ExportType.RETURN}>Trả hàng cho NCC</SelectItem>
+                                            <SelectItem value={ExportType.OTHER}>Khác (Hủy/Thanh lý)</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="customerName">Tên khách hàng</Label>
-                                        <Input
-                                            id="customerName"
-                                            value={formData.customerName}
-                                            onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                                            placeholder="Tên người/đơn vị nhận"
-                                            className="w-full"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="customerPhone">Số điện thoại</Label>
-                                        <Input
-                                            id="customerPhone"
-                                            value={formData.customerPhone}
-                                            onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
-                                            className="w-full"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="customerAddress">Địa chỉ</Label>
-                                        <Input
-                                            id="customerAddress"
-                                            value={formData.customerAddress}
-                                            onChange={(e) => setFormData({ ...formData, customerAddress: e.target.value })}
-                                            className="w-full"
-                                        />
-                                    </div>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="notes">Ghi chú</Label>
+                                    <Input
+                                        id="notes"
+                                        value={formData.notes}
+                                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                                        placeholder="Nhập ghi chú..."
+                                        className="h-9"
+                                    />
                                 </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <Label>Danh sách sản phẩm *</Label>
-                                {!formData.warehouseId && (
-                                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-2">
-                                        <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-                                        <p className="text-sm text-yellow-800">
-                                            Vui lòng chọn kho xuất trước để kiểm tra tồn kho
-                                        </p>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="customerName">Tên khách hàng</Label>
+                                    <Input
+                                        id="customerName"
+                                        value={formData.customerName}
+                                        onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                                        placeholder="Tên người/đơn vị nhận"
+                                        className="h-9"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="customerPhone">Số điện thoại</Label>
+                                    <Input
+                                        id="customerPhone"
+                                        value={formData.customerPhone}
+                                        onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
+                                        className="h-9"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="customerAddress">Địa chỉ</Label>
+                                    <Input
+                                        id="customerAddress"
+                                        value={formData.customerAddress}
+                                        onChange={(e) => setFormData({ ...formData, customerAddress: e.target.value })}
+                                        className="h-9"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2 border-t pt-4">
+                                <div className="flex justify-between items-center">
+                                    <Label>Danh sách sản phẩm *</Label>
+                                    {!formData.warehouseId && (
+                                        <span className="text-xs text-yellow-600 flex items-center gap-1">
+                                            <AlertTriangle className="h-3 w-3" />
+                                            Chọn kho trước để kiểm tra tồn kho
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="border rounded-lg overflow-hidden flex flex-col">
+                                    <div className="grid grid-cols-12 gap-2 bg-muted/50 p-2 text-xs font-medium border-b">
+                                        <div className="col-span-4 pl-2">Sản phẩm</div>
+                                        <div className="col-span-2">Số lượng</div>
+                                        <div className="col-span-3">Đơn giá</div>
+                                        <div className="col-span-2">Thành tiền</div>
+                                        <div className="col-span-1"></div>
                                     </div>
-                                )}
-                                <div className="border rounded-lg p-4 space-y-4">
-                                    <div className="grid grid-cols-12 gap-4 border-b pb-2">
-                                        <div className="col-span-4 font-medium text-sm">Sản phẩm</div>
-                                        <div className="col-span-2 font-medium text-sm">Số lượng</div>
-                                        <div className="col-span-3 font-medium text-sm">Đơn giá</div>
-                                        <div className="col-span-2 font-medium text-sm">Thành tiền</div>
-                                        <div className="col-span-1 font-medium text-sm"></div>
-                                    </div>
-                                    {productLines.map((line, index) => (
-                                        <div key={index} className="grid grid-cols-12 gap-4 items-start">
-                                            <div className="col-span-4">
-                                                <Select
-                                                    value={line.productId}
-                                                    onValueChange={(value) => handleLineChange(index, 'productId', value)}
-                                                    disabled={!formData.warehouseId}
-                                                >
-                                                    <SelectTrigger className="w-full">
-                                                        <SelectValue placeholder="Chọn sản phẩm" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {products?.map((prod) => (
-                                                            <SelectItem key={prod.id} value={prod.id}>
-                                                                <span className="truncate block max-w-[250px]" title={prod.name}>
-                                                                    {prod.name} ({prod.sku})
-                                                                </span>
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                            <div className="col-span-2">
-                                                <Input
-                                                    type="number"
-                                                    value={line.quantity}
-                                                    onChange={(e) =>
-                                                        handleLineChange(index, 'quantity', Number(e.target.value))
-                                                    }
-                                                    min={1}
-                                                    max={line.availableStock}
-                                                />
-                                                {line.availableStock !== undefined && (
-                                                    <p className="text-xs text-muted-foreground mt-1">
-                                                        Tồn: {line.availableStock}
-                                                        {line.quantity > line.availableStock && (
-                                                            <span className="text-red-600 block">Vượt quá!</span>
-                                                        )}
-                                                    </p>
-                                                )}
-                                            </div>
-                                            <div className="col-span-3">
-                                                <Input
-                                                    type="number"
-                                                    value={line.unitPrice}
-                                                    onChange={(e) =>
-                                                        handleLineChange(index, 'unitPrice', Number(e.target.value))
-                                                    }
-                                                    min={0}
-                                                />
-                                            </div>
-                                            <div className="col-span-2 flex items-center h-10">
-                                                <p className="text-sm font-medium">
-                                                    {formatCurrency(line.quantity * line.unitPrice)}
-                                                </p>
-                                            </div>
-                                            <div className="col-span-1 flex justify-end gap-1">
-                                                {index === productLines.length - 1 && (
-                                                    <Button type="button" size="icon" variant="ghost" onClick={handleAddLine}>
-                                                        <Plus className="h-4 w-4" />
-                                                    </Button>
-                                                )}
-                                                {productLines.length > 1 && (
-                                                    <Button
-                                                        type="button"
-                                                        size="icon"
-                                                        variant="ghost"
-                                                        className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                                                        onClick={() => handleRemoveLine(index)}
+                                    <div className="max-h-[30vh] overflow-y-auto p-2 space-y-2">
+                                        {productLines.map((line, index) => (
+                                            <div key={index} className="grid grid-cols-12 gap-2 items-center">
+                                                <div className="col-span-4">
+                                                    <Select
+                                                        value={line.productId}
+                                                        onValueChange={(value) => handleLineChange(index, 'productId', value)}
+                                                        disabled={!formData.warehouseId}
                                                     >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                )}
+                                                        <SelectTrigger className="h-8 text-sm">
+                                                            <SelectValue placeholder="Chọn SP" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {products?.filter(prod => {
+                                                                const stock = inventory?.find(
+                                                                    (inv) => inv.productId === prod.id && inv.warehouseId === formData.warehouseId
+                                                                );
+                                                                return stock && stock.quantity > 0;
+                                                            })?.map((prod) => (
+                                                                <SelectItem key={prod.id} value={prod.id}>
+                                                                    <span className="truncate block max-w-[200px]" title={prod.name}>
+                                                                        {prod.name}
+                                                                    </span>
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                                <div className="col-span-2">
+                                                    <Input
+                                                        type="number"
+                                                        value={line.quantity}
+                                                        onChange={(e) =>
+                                                            handleLineChange(index, 'quantity', Number(e.target.value))
+                                                        }
+                                                        min={1}
+                                                        max={line.availableStock}
+                                                        className="h-8 text-sm"
+                                                    />
+                                                </div>
+                                                <div className="col-span-3">
+                                                    <Input
+                                                        type="number"
+                                                        value={line.unitPrice}
+                                                        readOnly
+                                                        className="h-8 text-sm bg-muted font-medium"
+                                                    />
+                                                </div>
+                                                <div className="col-span-2">
+                                                    <p className="text-sm font-medium truncate">
+                                                        {formatCurrency(line.quantity * line.unitPrice)}
+                                                    </p>
+                                                </div>
+                                                <div className="col-span-1 flex justify-end gap-1">
+                                                    {index === productLines.length - 1 && (
+                                                        <Button type="button" size="icon" variant="ghost" className="h-8 w-8" onClick={handleAddLine}>
+                                                            <Plus className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
+                                                    {productLines.length > 1 && (
+                                                        <Button
+                                                            type="button"
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                                            onClick={() => handleRemoveLine(index)}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
+                                                </div>
                                             </div>
+                                        ))}
+                                    </div>
+                                    <div className="bg-muted/20 p-2 border-t flex justify-end">
+                                        <div className="text-right flex items-center gap-4">
+                                            <span className="text-sm text-muted-foreground">Tổng tiền:</span>
+                                            <span className="text-lg font-bold text-primary">
+                                                {formatCurrency(totalAmount)}
+                                            </span>
                                         </div>
-                                    ))}
-                                </div>
-                                <div className="flex justify-end">
-                                    <div className="text-right">
-                                        <p className="text-sm text-muted-foreground">Tổng tiền</p>
-                                        <p className="text-2xl font-bold text-primary">
-                                            {formatCurrency(totalAmount)}
-                                        </p>
                                     </div>
                                 </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="notes">Ghi chú</Label>
-                                <Input
-                                    id="notes"
-                                    value={formData.notes}
-                                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                                    placeholder="Nhập ghi chú thêm về phiếu xuất (tùy chọn)..."
-                                />
                             </div>
                         </div>
-                        <DialogFooter>
+                        <DialogFooter className="px-6 py-4 border-t shrink-0">
                             <Button type="button" variant="outline" onClick={handleCloseDialog}>
                                 Hủy
                             </Button>
@@ -549,14 +590,14 @@ export default function ExportsPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* View Dialog */}
+            { }
             {viewReceipt && (
                 <Dialog open={!!viewReceipt} onOpenChange={() => setViewReceipt(null)}>
-                    <DialogContent className="sm:max-w-7xl">
-                        <DialogHeader>
+                    <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
+                        <DialogHeader className="p-6 pb-2 shrink-0">
                             <DialogTitle>Chi tiết phiếu xuất #{viewReceipt.receiptNumber}</DialogTitle>
                         </DialogHeader>
-                        <div className="space-y-4">
+                        <div className="flex-1 overflow-y-auto p-6 pt-2 space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <p className="text-sm text-muted-foreground">Ngày xuất</p>
@@ -647,43 +688,46 @@ export default function ExportsPage() {
                                     <p>{viewReceipt.notes}</p>
                                 </div>
                             )}
+                        </div>
 
-                            <div className="flex gap-2">
-                                {viewReceipt.status === ExportStatus.PENDING && (
-                                    <>
-                                        <Button
-                                            onClick={() => handleUpdateStatus(viewReceipt.id, ExportStatus.APPROVED)}
-                                        >
-                                            Duyệt phiếu
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            onClick={() => handleUpdateStatus(viewReceipt.id, ExportStatus.COMPLETED)}
-                                        >
-                                            Hoàn thành
-                                        </Button>
-                                        <Button
-                                            variant="destructive"
-                                            onClick={() => handleUpdateStatus(viewReceipt.id, ExportStatus.CANCELLED)}
-                                        >
-                                            Hủy phiếu
-                                        </Button>
-                                    </>
-                                )}
-                                {viewReceipt.status === ExportStatus.APPROVED && (
+                        <div className="p-6 pt-2 shrink-0 flex gap-2 justify-end">
+                            {viewReceipt.status === ExportStatus.PENDING && (
+                                <>
                                     <Button
+                                        onClick={() => handleUpdateStatus(viewReceipt.id, ExportStatus.APPROVED)}
+                                    >
+                                        Duyệt phiếu
+                                    </Button>
+                                    <Button
+                                        variant="outline"
                                         onClick={() => handleUpdateStatus(viewReceipt.id, ExportStatus.COMPLETED)}
                                     >
-                                        Hoàn thành xuất kho
+                                        Hoàn thành
                                     </Button>
-                                )}
-                            </div>
+                                    <Button
+                                        variant="destructive"
+                                        onClick={() => handleUpdateStatus(viewReceipt.id, ExportStatus.CANCELLED)}
+                                    >
+                                        Hủy phiếu
+                                    </Button>
+                                </>
+                            )}
+                            {viewReceipt.status === ExportStatus.APPROVED && (
+                                <Button
+                                    onClick={() => handleUpdateStatus(viewReceipt.id, ExportStatus.COMPLETED)}
+                                >
+                                    Hoàn thành xuất kho
+                                </Button>
+                            )}
+                            <Button variant="outline" onClick={() => setViewReceipt(null)}>
+                                Đóng
+                            </Button>
                         </div>
                     </DialogContent>
                 </Dialog>
             )}
 
-            {/* Confirmation Dialog */}
+            { }
             <Dialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}>
                 <DialogContent>
                     <DialogHeader>

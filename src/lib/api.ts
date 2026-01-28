@@ -9,10 +9,10 @@ export const api = axios.create({
   },
 });
 
-// Add token to requests
+
 api.interceptors.request.use(
   (config) => {
-    // Try to get token from localStorage
+    
     const token = localStorage.getItem('token');
     
     if (token) {
@@ -26,12 +26,12 @@ api.interceptors.request.use(
   }
 );
 
-// Handle auth errors
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Clear auth on 401
+      
       localStorage.removeItem('token');
       localStorage.removeItem('auth-storage');
       window.location.href = '/login';

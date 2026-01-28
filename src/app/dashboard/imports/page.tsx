@@ -105,8 +105,12 @@ export default function ImportsPage() {
             queryClient.invalidateQueries({ queryKey: ['inventory'] });
             toast.success('Cập nhật trạng thái thành công!');
             setViewReceipt(null);
+            setConfirmDialog(prev => ({ ...prev, open: false }));
         },
-        onError: () => toast.error('Có lỗi xảy ra!'),
+        onError: (error: any) => {
+            const message = error.response?.data?.message || 'Có lỗi xảy ra!';
+            toast.error(Array.isArray(message) ? message[0] : message);
+        },
     });
 
     const handleCloseDialog = () => {
@@ -137,7 +141,7 @@ export default function ImportsPage() {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Validate required fields
+        
         if (!formData.importDate) {
             toast.error('Vui lòng chọn ngày nhập!');
             return;
@@ -155,8 +159,8 @@ export default function ImportsPage() {
 
         const data = {
             ...formData,
-            importDate: new Date(formData.importDate).toISOString(), // Convert to ISO string for IsDateString validation
-            supplierId: formData.supplierId || undefined, // Send undefined if empty to skip IsUUID validation
+            importDate: new Date(formData.importDate).toISOString(), 
+            supplierId: formData.supplierId || undefined, 
             status: ImportStatus.PENDING,
             details: validLines.map((line) => ({
                 productId: line.productId,
@@ -169,9 +173,30 @@ export default function ImportsPage() {
     };
 
     const handleUpdateStatus = (id: string, status: ImportStatus) => {
-        if (confirm(`Bạn có chắc chắn muốn chuyển sang trạng thái "${status}"?`)) {
-            updateStatusMutation.mutate({ id, status });
+        let title = '';
+        let description = '';
+
+        switch (status) {
+            case ImportStatus.APPROVED:
+                title = 'Duyệt phiếu nhập';
+                description = 'Bạn có chắc chắn muốn duyệt phiếu nhập này? Trạng thái sẽ chuyển thành "Đã duyệt".';
+                break;
+            case ImportStatus.COMPLETED:
+                title = 'Hoàn thành nhập kho';
+                description = 'Xác nhận hàng đã thực tế nhập kho. Hành động này sẽ cập nhật số lượng tồn kho và không thể hoàn tác.';
+                break;
+            case ImportStatus.CANCELLED:
+                title = 'Hủy phiếu nhập';
+                description = 'Bạn có chắc chắn muốn hủy phiếu nhập này? Trạng thái sẽ chuyển thành "Đã hủy".';
+                break;
         }
+
+        setConfirmDialog({
+            open: true,
+            title,
+            description,
+            action: () => updateStatusMutation.mutate({ id, status }),
+        });
     };
 
     const totalAmount = productLines.reduce(
@@ -286,7 +311,7 @@ export default function ImportsPage() {
                 )}
             </div>
 
-            {/* Create Dialog */}
+            {}
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                 <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
@@ -452,7 +477,7 @@ export default function ImportsPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* View Dialog */}
+            {}
             {viewReceipt && (
                 <Dialog open={!!viewReceipt} onOpenChange={() => setViewReceipt(null)}>
                     <DialogContent className="sm:max-w-7xl">
@@ -562,7 +587,7 @@ export default function ImportsPage() {
                 </Dialog>
             )}
 
-            {/* Confirmation Dialog */}
+            {}
             <Dialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}>
                 <DialogContent>
                     <DialogHeader>
